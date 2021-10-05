@@ -1,0 +1,100 @@
+#### aggregateByKey로 키의 모든 값 그루핑
+
+
+
+scala> val prods = transByCust.aggregateByKey(List[String]())(
+     |    (prods, tran) => prods ::: List(tran(3)),
+     |    (prods1, prods2) => prods1 ::: prods2)
+prods: org.apache.spark.rdd.RDD[(Int, List[String])] = ShuffledRDD[27] at aggregateByKey at <console>:25
+
+scala> prods.collect()val list = List.fill(500)(scala.util.Random.nextInt(100))
+<console>:1: error: ';' expected but 'val' found.
+       prods.collect()val list = List.fill(500)(scala.util.Random.nextInt(100))
+                      ^
+
+
+
+
+
+#### 파티션의 데이터를 수집하는 glom 변환 연산자
+
+
+
+scala> val list = List.fill(500)(scala.util.Random.nextInt(100))
+list: List[Int] = List(1, 61, 98, 95, 22, 91, 74, 59, 65, 17, 40, 58, 56, 29, 83, 20, 11, 44, 2, 32, 30, 95, 54, 93, 24, 2, 41, 15, 19, 81, 27, 30, 38, 6, 14, 25, 20, 75, 74, 64, 69, 18, 98, 60, 76, 10, 99, 67, 27, 34, 38, 41, 23, 22, 58, 81, 51, 86, 20, 50, 79, 4, 95, 83, 70, 45, 88, 85, 9, 68, 6, 36, 9, 86, 19, 15, 89, 49, 59, 82, 8, 72, 51, 76, 45, 85, 11, 66, 96, 36, 29, 32, 18, 76, 80, 61, 94, 31, 60, 45, 82, 69, 93, 15, 69, 10, 72, 21, 18, 34, 75, 22, 55, 87, 28, 90, 37, 95, 4, 69, 27, 35, 78, 13, 3, 47, 39, 78, 60, 47, 59, 38, 43, 80, 46, 14, 97, 85, 48, 12, 60, 17, 46, 17, 86, 34, 17, 23, 19, 31, 98, 40, 5, 83, 57, 99, 35, 70, 44, 13, 62, 66, 8, 31, 3, 83, 98, 67, 44, 15, 63, 77, 55, 78, 66, 29, 43, 17, 55, 26, 82, 58, 33, 77, 16, 49, 90, 60, 37, 22, 63...
+
+scala> val rdd = sc.parallelize(list,30).glom()
+rdd: org.apache.spark.rdd.RDD[Array[Int]] = MapPartitionsRDD[29] at glom at <console>:26
+
+scala> rdd.collect()
+res6: Array[Array[Int]] = Array(Array(1, 61, 98, 95, 22, 91, 74, 59, 65, 17, 40, 58, 56, 29, 83, 20), Array(11, 44, 2, 32, 30, 95, 54, 93, 24, 2, 41, 15, 19, 81, 27, 30, 38), Array(6, 14, 25, 20, 75, 74, 64, 69, 18, 98, 60, 76, 10, 99, 67, 27, 34), Array(38, 41, 23, 22, 58, 81, 51, 86, 20, 50, 79, 4, 95, 83, 70, 45), Array(88, 85, 9, 68, 6, 36, 9, 86, 19, 15, 89, 49, 59, 82, 8, 72, 51), Array(76, 45, 85, 11, 66, 96, 36, 29, 32, 18, 76, 80, 61, 94, 31, 60, 45), Array(82, 69, 93, 15, 69, 10, 72, 21, 18, 34, 75, 22, 55, 87, 28, 90), Array(37, 95, 4, 69, 27, 35, 78, 13, 3, 47, 39, 78, 60, 47, 59, 38, 43), Array(80, 46, 14, 97, 85, 48, 12, 60, 17, 46, 17, 86, 34, 17, 23, 19, 31), Array(98, 40, 5, 83, 57, 99, 35, 70, 44, 13, 62, 66, 8, 31, 3, 83), Array(98, 67, 44, 1...
+
+scala>  rdd.count()
+res7: Long = 30
+
+
+
+#### 데이터 조인
+
+
+
+scala> val transByProd = tranData.map(tran => (tran(3).toInt, tran))
+transByProd: org.apache.spark.rdd.RDD[(Int, Array[String])] = MapPartitionsRDD[30] at map at <console>:25
+
+
+
+#### join 연산자를 호출해 상품 데이터와 매출 데이터를 결합
+
+
+
+scala> val products = sc.textFile("data_products.txt").
+     |     map(line => line.split("#")).
+     |     map(p => (p(0).toInt, p))
+products: org.apache.spark.rdd.RDD[(Int, Array[String])] = MapPartitionsRDD[34] at map at <console>:26
+
+scala> val totalsByProd = transByProd.mapValues(t => t(5).toDouble).
+     | reduceByKey{case(tot1, tot2) => tot1 + tot2}
+totalsByProd: org.apache.spark.rdd.RDD[(Int, Double)] = ShuffledRDD[36] at reduceByKey at <console>:26
+
+scala> val totalsAndProd = transByProd.join(products)
+totalsAndProd: org.apache.spark.rdd.RDD[(Int, (Array[String], Array[String]))] = MapPartitionsRDD[39] at join at <console>:27
+
+scala> val totalsAndProd = totalsByProd.join(products)
+totalsAndProd: org.apache.spark.rdd.RDD[(Int, (Double, Array[String]))] = MapPartitionsRDD[42] at join at <console>:27
+
+scala> totalsAndProd.first()
+res10: (Int, (Double, Array[String])) = (34,(62592.43000000001,Array(34, GAM X360 Assassins Creed 3, 6363.95, 9)))
+
+scala> val totalsWithMissingProds = totalsByProd.rightOuterJoin(products)
+totalsWithMissingProds: org.apache.spark.rdd.RDD[(Int, (Option[Double], Array[String]))] = MapPartitionsRDD[45] at rightOuterJoin at <console>:27
+
+scala> val missingProds = totalsWithMissingProds.filter(x => x._2._1 == None).map(x => x._2_2)
+<console>:25: error: value _2_2 is not a member of (Int, (Option[Double], Array[String]))
+       val missingProds = totalsWithMissingProds.filter(x => x._2._1 == None).map(x => x._2_2)
+                                                                                         ^
+
+scala> val missingProds = totalsWithMissingProds.filter(x => x._2._1 == None).map(x => x._2._2)
+missingProds: org.apache.spark.rdd.RDD[Array[String]] = MapPartitionsRDD[47] at map at <console>:25
+
+
+
+scala> missingProds.foreach(p => println(p.mkString(",")))
+20,LEGO Elves,4589.79,4
+63,Pajamas,8131.85,3
+43,Tomb Raider PC,2718.14,1
+3,Cute baby doll, battery,1808.79,2
+
+
+
+#### subtract나 subtractByKey 변환 연산자로 공통 값 제거
+
+
+
+scala> val missingProds = products.subtractByKey(totalsByProd).values
+missingProds: org.apache.spark.rdd.RDD[Array[String]] = MapPartitionsRDD[49] at values at <console>:27
+
+scala> missingProds.foreach(p => println(p.mkString(",")))
+3,Cute baby doll, battery,1808.79,2
+43,Tomb Raider PC,2718.14,1
+63,Pajamas,8131.85,3
+20,LEGO Elves,4589.79,4
